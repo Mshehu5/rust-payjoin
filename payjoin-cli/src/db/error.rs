@@ -2,6 +2,7 @@ use std::fmt;
 
 #[cfg(feature = "v2")]
 use bitcoincore_rpc::jsonrpc::serde_json;
+use payjoin::ImplementationError;
 use r2d2::Error as R2d2Error;
 use rusqlite::Error as RusqliteError;
 
@@ -9,34 +10,27 @@ pub(crate) type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub(crate) enum Error {
-    Rusqlite(RusqliteError),
-    R2d2(R2d2Error),
+    Sled(SledError),
     #[cfg(feature = "v2")]
     Serialize(serde_json::Error),
     #[cfg(feature = "v2")]
     Deserialize(serde_json::Error),
+    #[cfg(feature = "v2")]
+    NotFound(String),
+    #[cfg(feature = "v2")]
+    TryFromSlice(std::array::TryFromSliceError),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::Rusqlite(e) => write!(f, "Database operation failed: {e}"),
-            Error::R2d2(e) => write!(f, "Connection pool error: {e}"),
+            Error::Sled(e) => write!(f, "Database operation failed: {e}"),
             #[cfg(feature = "v2")]
             Error::Serialize(e) => write!(f, "Serialization failed: {e}"),
             #[cfg(feature = "v2")]
             Error::Deserialize(e) => write!(f, "Deserialization failed: {e}"),
-        }
-    }
-}
-
-impl std::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Error::Rusqlite(e) => Some(e),
-            Error::R2d2(e) => Some(e),
             #[cfg(feature = "v2")]
-            Error::Serialize(e) => Some(e),
+            Error::NotFound(key) => write!(f, "Key not found: {key}"),
             #[cfg(feature = "v2")]
             Error::Deserialize(e) => Some(e),
         }
@@ -61,4 +55,8 @@ impl From<serde_json::Error> for Error {
             | serde_json::error::Category::Eof => Error::Deserialize(error), // All parsing/reading errors
         }
     }
+}
+
+impl From<Error> for ImplementationError {
+    fn from(error: Error) -> Self { ImplementationError::new(error) }
 }
