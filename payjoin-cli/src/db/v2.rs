@@ -9,10 +9,9 @@ use rusqlite::params;
 
 use super::*;
 
-macro_rules! now {
-    () => {
-        SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as i64
-    };
+#[inline]
+fn now() -> i64 {
+    SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as i64
 }
 
 #[derive(Debug, Clone)]
@@ -28,13 +27,6 @@ impl SessionId {
             SessionId::Receive(id) => *id,
         }
     }
-
-    pub fn session_type(&self) -> &'static str {
-        match self {
-            SessionId::Send(_) => "send",
-            SessionId::Receive(_) => "receive",
-        }
-    }
 }
 
 #[derive(Clone)]
@@ -48,10 +40,7 @@ impl SenderPersister {
         let conn = db.get_connection()?;
 
         // Create a new session in send_sessions table
-        conn.execute(
-            "INSERT INTO send_sessions (completed_at) VALUES (?1)",
-            params![Option::<i64>::None],
-        )?;
+        conn.execute("INSERT INTO send_sessions (completed_at) VALUES (NULL)", [])?;
 
         // Get the generated session ID
         let session_id = conn.last_insert_rowid();
@@ -78,11 +67,11 @@ impl SessionPersister for SenderPersister {
     ) -> std::result::Result<(), Self::InternalStorageError> {
         let conn = self.db.get_connection()?;
         let event_data = serde_json::to_string(event).map_err(Error::Serialize)?;
-        let timestamp = now!();
+        let timestamp = now();
 
         conn.execute(
-            "INSERT INTO session_events (session_id, session_type, event_data, created_at) VALUES (?1, ?2, ?3, ?4)",
-            params![self.session_id.as_integer(), self.session_id.session_type(), event_data, timestamp],
+            "INSERT INTO send_session_events (session_id, event_data, created_at) VALUES (?1, ?2, ?3)",
+            params![self.session_id.as_integer(), event_data, timestamp],
         )?;
 
         Ok(())
@@ -94,16 +83,13 @@ impl SessionPersister for SenderPersister {
     {
         let conn = self.db.get_connection()?;
         let mut stmt = conn.prepare(
-            "SELECT event_data FROM session_events WHERE session_id = ?1 AND session_type = ?2 ORDER BY created_at ASC",
+            "SELECT event_data FROM send_session_events WHERE session_id = ?1 ORDER BY created_at ASC",
         )?;
 
-        let event_rows = stmt.query_map(
-            params![self.session_id.as_integer(), self.session_id.session_type()],
-            |row| {
-                let event_data: String = row.get(0)?;
-                Ok(event_data)
-            },
-        )?;
+        let event_rows = stmt.query_map(params![self.session_id.as_integer()], |row| {
+            let event_data: String = row.get(0)?;
+            Ok(event_data)
+        })?;
 
         let mut events = Vec::new();
         for event_row in event_rows {
@@ -118,7 +104,7 @@ impl SessionPersister for SenderPersister {
 
     fn close(&self) -> std::result::Result<(), Self::InternalStorageError> {
         let conn = self.db.get_connection()?;
-        let timestamp = now!();
+        let timestamp = now();
 
         conn.execute(
             "UPDATE send_sessions SET completed_at = ?1 WHERE session_id = ?2",
@@ -139,10 +125,7 @@ impl ReceiverPersister {
     pub fn new(db: Arc<Database>) -> crate::db::Result<Self> {
         let conn = db.get_connection()?;
 
-        conn.execute(
-            "INSERT INTO receive_sessions (completed_at) VALUES (?1)",
-            params![Option::<i64>::None],
-        )?;
+        conn.execute("INSERT INTO receive_sessions (completed_at) VALUES (NULL)", [])?;
 
         let session_id = conn.last_insert_rowid();
 
@@ -168,11 +151,11 @@ impl SessionPersister for ReceiverPersister {
     ) -> std::result::Result<(), Self::InternalStorageError> {
         let conn = self.db.get_connection()?;
         let event_data = serde_json::to_string(event).map_err(Error::Serialize)?;
-        let timestamp = now!();
+        let timestamp = now();
 
         conn.execute(
-            "INSERT INTO session_events (session_id, session_type, event_data, created_at) VALUES (?1, ?2, ?3, ?4)",
-            params![self.session_id.as_integer(), self.session_id.session_type(), event_data, timestamp],
+            "INSERT INTO receive_session_events (session_id, event_data, created_at) VALUES (?1, ?2, ?3)",
+            params![self.session_id.as_integer(), event_data, timestamp],
         )?;
 
         Ok(())
@@ -186,16 +169,13 @@ impl SessionPersister for ReceiverPersister {
     > {
         let conn = self.db.get_connection()?;
         let mut stmt = conn.prepare(
-            "SELECT event_data FROM session_events WHERE session_id = ?1 AND session_type = ?2 ORDER BY created_at ASC",
+            "SELECT event_data FROM receive_session_events WHERE session_id = ?1 ORDER BY created_at ASC",
         )?;
 
-        let event_rows = stmt.query_map(
-            params![self.session_id.as_integer(), self.session_id.session_type()],
-            |row| {
-                let event_data: String = row.get(0)?;
-                Ok(event_data)
-            },
-        )?;
+        let event_rows = stmt.query_map(params![self.session_id.as_integer()], |row| {
+            let event_data: String = row.get(0)?;
+            Ok(event_data)
+        })?;
 
         let mut events = Vec::new();
         for event_row in event_rows {
@@ -210,7 +190,7 @@ impl SessionPersister for ReceiverPersister {
 
     fn close(&self) -> std::result::Result<(), Self::InternalStorageError> {
         let conn = self.db.get_connection()?;
-        let timestamp = now!();
+        let timestamp = now();
 
         conn.execute(
             "UPDATE receive_sessions SET completed_at = ?1 WHERE session_id = ?2",

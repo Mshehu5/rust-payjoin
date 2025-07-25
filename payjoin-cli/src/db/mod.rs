@@ -34,6 +34,9 @@ impl Database {
     }
 
     fn init_schema(conn: &Connection) -> Result<()> {
+        // Enable foreign keys
+        conn.execute("PRAGMA foreign_keys = ON", [])?;
+
         conn.execute(
             "CREATE TABLE IF NOT EXISTS send_sessions (
                 session_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,12 +54,23 @@ impl Database {
         )?;
 
         conn.execute(
-            "CREATE TABLE IF NOT EXISTS session_events (
+            "CREATE TABLE IF NOT EXISTS send_session_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 session_id INTEGER NOT NULL,
-                session_type TEXT NOT NULL,
                 event_data TEXT NOT NULL,
-                created_at INTEGER NOT NULL
+                created_at INTEGER NOT NULL,
+                FOREIGN KEY(session_id) REFERENCES send_sessions(session_id)
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS receive_session_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id INTEGER NOT NULL,
+                event_data TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                FOREIGN KEY(session_id) REFERENCES receive_sessions(session_id)
             )",
             [],
         )?;
