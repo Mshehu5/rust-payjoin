@@ -16,17 +16,25 @@ pub mod v1;
 #[cfg(feature = "v2")]
 pub mod v2;
 
+/// Parsed value of the `pj` URI parameter.
+///
+/// The `pj` parameter identifies how the sender should reach the receiver for Payjoin.
+/// Depending on the URI contents and enabled features, it is parsed as either a BIP78 v1
+/// endpoint or a BIP77 v2 endpoint.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 #[cfg_attr(feature = "v2", allow(clippy::large_enum_variant))]
 pub enum PjParam {
+    /// A BIP78 v1 Payjoin endpoint URL.
     #[cfg(feature = "v1")]
     V1(v1::PjParam),
+    /// A BIP77 v2 directory endpoint with its required fragment parameters.
     #[cfg(feature = "v2")]
     V2(v2::PjParam),
 }
 
 impl PjParam {
+    /// Parse the `pj` URI parameter into the supported Payjoin version.
     pub fn parse(endpoint: impl super::IntoUrl) -> Result<Self, PjParseError> {
         let endpoint = endpoint.into_url().map_err(InternalPjParseError::IntoUrl)?;
 
@@ -47,6 +55,7 @@ impl PjParam {
         compile_error!("Either v1 or v2 feature must be enabled");
     }
 
+    /// Return the normalized Payjoin endpoint encoded by `pj`.
     pub fn endpoint(&self) -> String { self.endpoint_url().to_string() }
 
     pub(crate) fn endpoint_url(&self) -> crate::core::Url {
@@ -91,22 +100,99 @@ impl MaybePayjoinExtras {
     }
 }
 
-/// Validated payjoin parameters
+/// Validated Payjoin parameters extracted from a BIP21 URI.
+///
+/// Supported parameters:
+///
+/// - `pj`: the Payjoin endpoint. For v1 this is the receiver's endpoint URL. For v2 this
+///   encodes the directory URL, short ID, and required `RK1`, `OH1`, and `EX1` fragment
+///   parameters.
+/// - `pjos`: the receiver's output substitution preference. `0` disables output
+///   substitution; `1` and omission both mean output substitution is enabled.
 #[derive(Debug, Clone)]
 pub struct PayjoinExtras {
-    /// pj parameter
+    /// The parsed `pj` parameter.
     pub(crate) pj_param: PjParam,
-    /// pjos parameter
+    /// The parsed `pjos` parameter, defaulting to enabled when omitted.
     pub(crate) output_substitution: OutputSubstitution,
 }
 
 impl PayjoinExtras {
+    /// Return the validated `pj` parameter.
     pub fn pj_param(&self) -> &PjParam { &self.pj_param }
+    /// Return the normalized Payjoin endpoint encoded by `pj`.
     pub fn endpoint(&self) -> String { self.pj_param.endpoint() }
+    /// Return the receiver's `pjos` preference.
     pub fn output_substitution(&self) -> OutputSubstitution { self.output_substitution }
 }
 
+/// A [Bitcoin URI](https://crates.io/crates/bitcoin_uri) with optional Payjoin support.
+///
+/// This type alias adds Payjoin-specific extras. The URI can represent either a
+/// standard Bitcoin payment request or one that supports Payjoin transactions.
+///
+/// # Examples
+///
+/// ### Parse a URI and validate Payjoin support
+///
+/// ```no_run
+/// use payjoin::{PjUri, Uri, UriExt};
+///
+/// let bip21_uri = "bitcoin:12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX?amount=0.01&pj=https://example.com/pj";
+/// let pj_uri: PjUri<'_> = Uri::try_from(bip21_uri)
+///     .expect("parse BIP21 uri")
+///     .assume_checked()
+///     .check_pj_supported()
+///     .expect("URI supports Payjoin");
+/// ```
+///
+/// See [`PjUri`] for initializing a sender once the URI has been validated.
 pub type Uri<'a, NetworkValidation> = bitcoin_uri::Uri<'a, NetworkValidation, MaybePayjoinExtras>;
+
+/// A [Bitcoin URI](https://crates.io/crates/bitcoin_uri) that is guaranteed to support Payjoin.
+///
+/// This type alias has validated Payjoin support. Unlike [`Uri`], this type
+/// guarantees that the URI contains valid Payjoin parameters and can be used
+/// for Payjoin operations.
+///
+/// # Examples
+///
+/// ### Initialize the appropriate sender from a validated `PjUri`
+///
+/// ```no_run
+/// use bitcoin::{psbt::Psbt, FeeRate};
+/// use payjoin::{PjUri, Uri, UriExt};
+/// use std::str::FromStr;
+///
+/// # let bip21_uri = "bitcoin:12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX?amount=0.01&pj=https://example.com/pj";
+/// # let pj_uri: PjUri<'_> = Uri::try_from(bip21_uri)
+/// #     .expect("parse BIP21 uri")
+/// #     .assume_checked()
+/// #     .check_pj_supported()
+/// #     .expect("URI supports Payjoin");
+/// // Build a PSBT from your wallet and initialize the sender for the URI version.
+/// let psbt = Psbt::from_str("cHNidP8BAH0CAAAA...").expect("valid PSBT");
+///
+/// match pj_uri.extras.pj_param() {
+///     #[cfg(feature = "v1")]
+///     payjoin::PjParam::V1(pj_param) => {
+///         let _sender = payjoin::send::v1::SenderBuilder::from_parts(
+///             psbt,
+///             pj_param,
+///             &pj_uri.address,
+///             pj_uri.amount,
+///         )
+///         .build_recommended(FeeRate::BROADCAST_MIN)
+///         .expect("build v1 sender");
+///     }
+///     #[cfg(feature = "v2")]
+///     payjoin::PjParam::V2(_) => {
+///         let _sender = payjoin::send::v2::SenderBuilder::new(psbt, pj_uri)
+///             .build_recommended(FeeRate::BROADCAST_MIN)
+///             .expect("build v2 sender");
+///     }
+/// }
+/// ```
 pub type PjUri<'a> = bitcoin_uri::Uri<'a, NetworkChecked, PayjoinExtras>;
 
 mod sealed {
