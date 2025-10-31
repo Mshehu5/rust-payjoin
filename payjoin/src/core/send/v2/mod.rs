@@ -15,11 +15,7 @@
 //! 7. Broadcast the Payjoin Transaction (and cancel the optional fallback broadcast)
 //!
 //! This crate is runtime-agnostic. Data persistence, chain interactions, and networking may be
-//! provided by custom implementations or copy the reference
-//! [`payjoin-cli`](https://github.com/payjoin/rust-payjoin/tree/master/payjoin-cli) for bitcoind,
-//! [`nolooking`](https://github.com/chaincase-app/nolooking) for LND, or
-//! [`bitmask-core`](https://github.com/diba-io/bitmask-core) BDK integration. Bring your own
-//! wallet and http client.
+//! provided by custom implementations or copy the reference. See the crate-level documentation for reference and integrations
 //!
 //! OHTTP Privacy Warning
 //! Encapsulated requests whether GET or POST—**must not be retried or reused**.

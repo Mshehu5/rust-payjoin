@@ -13,6 +13,17 @@
 //! Types relevant to a Payjoin Directory as defined in BIP 77 are available in the [`directory`] module enabled by
 //!  the `directory` feature.
 //!
+//! ## Examples and integrations
+//!
+//! - [`payjoin-cli`](https://github.com/payjoin/rust-payjoin/tree/master/payjoin-cli): reference
+//!   implementation using Bitcoin Core. Supports both V1 and V2.
+//! - [`nolooking`](https://github.com/chaincase-app/nolooking): LND integration. Note: currently a
+//!   V1-focused example; it does not include V2 integration.
+//! - [`bitmask-core`](https://github.com/diba-io/bitmask-core): BDK integration example.
+//! - [`payjoin-ffi`](https://github.com/payjoin/rust-payjoin/tree/master/payjoin-ffi): language
+//!   bindings for mobile/desktop (e.g., Python and Dart) that can be used to integrate Payjoin in
+//!   non-Rust apps.
+//!
 //! ## Disclaimer ⚠️ WIP
 //!
 //! **Use at your own risk. This crate has not yet been reviewed by independent Rust and Bitcoin security professionals.**
