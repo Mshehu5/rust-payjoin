@@ -2,8 +2,8 @@ name: Weekly Standup
 
 on:
   schedule:
-    # Monday 00:00 UTC = Monday 08:00 Taipei
-    - cron: "0 0 * * 1"
+    # Wednesday 22:55 UTC = Thursday 06:55 Taipei
+    - cron: "55 22 * * 3"
   workflow_dispatch:
     inputs:
       dry_run:
