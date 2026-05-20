@@ -54,7 +54,7 @@ impl RelayManager {
     }
 
     async fn fetch_ohttp_keys(&self) -> Result<ValidatedOhttpKeys> {
-        let payjoin_directory = &self.config.v2()?.pj_directory;
+        let payjoin_directory = self.config.v2()?.trusted_directory();
 
         loop {
             let selected_relay = self.choose_relay()?;

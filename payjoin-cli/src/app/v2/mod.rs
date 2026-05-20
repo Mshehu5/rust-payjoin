@@ -280,9 +280,12 @@ impl AppTrait for App {
         let address = self.wallet().get_new_address()?;
         let ohttp_keys = self.relay_manager.unwrap_ohttp_keys_or_else_fetch().await?.ohttp_keys;
         let persister = ReceiverPersister::new(self.db.clone())?;
-        let mut receiver_builder =
-            ReceiverBuilder::new(address, self.config.v2()?.pj_directory.as_str(), ohttp_keys)?
-                .with_amount(amount);
+        let mut receiver_builder = ReceiverBuilder::new(
+            address,
+            self.config.v2()?.trusted_directory().as_str(),
+            ohttp_keys,
+        )?
+        .with_amount(amount);
         if let Some(max_fee_rate) = self.config.max_fee_rate {
             receiver_builder = receiver_builder.with_max_fee_rate(max_fee_rate);
         }
