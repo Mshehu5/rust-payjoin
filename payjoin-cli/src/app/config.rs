@@ -110,9 +110,7 @@ pub struct V2Config {
 
 #[cfg(feature = "v2")]
 impl V2Config {
-    pub fn trusted_directory(&self) -> &Url {
-        self.trusted_directories.first().expect("validated trusted directory")
-    }
+    pub fn trusted_directories(&self) -> &[Url] { &self.trusted_directories }
 
     fn validate(&self) -> Result<(), ConfigError> {
         if self.trusted_directories.is_empty() {
